@@ -38,24 +38,32 @@ const User = sequelize.define("User", {
   },
 });
 
-// const Role = sequelize.define('Role', {
-// 	name : {
-// 		type : DataTypes.STRING,
-// 		allowNull : false,
-// 	}
-// })
+const Role = sequelize.define("Role", {
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
+});
 
-// User.belongsTo(Role);
+User.belongsTo(Role);
 
 User.sync({ force: true })
   .then((data) => {
-    console.log("Table and media synced successfully!");
+    console.log("La table User cree avec succes");
   })
   .catch((err) => {
-    console.log("Error syncing the table and model");
+    console.log("Erreur survenue lors de la creation de la table user");
   });
 
-// Role.create({name: 'admin'});
+Role.sync({ force: true })
+  .then((data) => {
+    console.log("La table role a ete cree");
+    Role.create({ name: "admin" });
+  })
+  .catch((err) => {
+    console.log("Erreur survenue lors de la creation de la table role");
+  });
+
 // Middleware
 
 app.engine("hbs", hbs({ extname: ".hbs" }));
@@ -120,11 +128,20 @@ function isLoggedOut(req, res, next) {
   res.redirect("/");
 }
 
-// function isAdmin(req, res, next){
-// 	if(req.user && req.user.Role.name === 'admin')
-// }
+function isAdmin(req, res, next) {
+  if (req.user && req.user.Role.name === "admin") {
+    next();
+  } else {
+    res.redirect("/");
+  }
+}
 
 // ROUTES
+
+app.get("/admin", isAdmin, (req, res) => {
+  //code pour la page d'administration
+});
+
 app.get("/", isLoggedIn, (req, res) => {
   res.render("index", { title: "Home" });
 });
@@ -181,6 +198,7 @@ app.get("/setup", async (req, res) => {
       User.create({
         username: "admin",
         password: hash,
+        RoleId: 1,
       })
         .then(() => {
           console.log("Admin user created successfully.");
