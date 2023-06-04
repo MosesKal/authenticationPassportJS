@@ -15,25 +15,17 @@ const sequelize = new Sequelize("rules_db", "moses", "moses", {
   dialect: "postgres",
 });
 
-// mongoose.connect("mongodb://localhost:27017/node-auth", {
-// 	useNewUrlParser: true,
-// 	useUnifiedTopology: true
-// });
+// Vérifiez la connexion à la base de données
+sequelize
+  .authenticate()
+  .then(() => {
+    console.log("Connexion à la base de données réussie.");
+  })
+  .catch((err) => {
+    console.error("Impossible de se connecter à la base de données:", err);
+  });
 
-/** création d'un modèle */
-
-// const UserSchema = new mongoose.Schema({
-//   username: {
-//     type: String,
-//     required: true,
-//   },
-//   password: {
-//     type: String,
-//     required: true,
-//   },
-// });
-
-// const User = mongoose.model("User", UserSchema);
+//Model definitione
 
 const User = sequelize.define("User", {
   username: {
@@ -46,17 +38,14 @@ const User = sequelize.define("User", {
   },
 });
 
-// Vérifiez la connexion à la base de données
-sequelize
-  .authenticate()
-  .then(() => {
-    console.log("Connexion à la base de données réussie.");
-  })
-  .catch((err) => {
-    console.error("Impossible de se connecter à la base de données:", err);
-  });
+// const Role = sequelize.define('Role', {
+// 	name : {
+// 		type : DataTypes.STRING,
+// 		allowNull : false,
+// 	}
+// })
 
-// mapping
+// User.belongsTo(Role);
 
 User.sync({ force: true })
   .then((data) => {
@@ -66,6 +55,7 @@ User.sync({ force: true })
     console.log("Error syncing the table and model");
   });
 
+// Role.create({name: 'admin'});
 // Middleware
 
 app.engine("hbs", hbs({ extname: ".hbs" }));
@@ -89,35 +79,15 @@ passport.serializeUser(function (user, done) {
   done(null, user.id);
 });
 
-// passport.deserializeUser(function (id, done) {
-//   User.findById(id, function (err, user) {
-//     done(err, user);
-//   });
-// });
-
 passport.deserializeUser(function (id, done) {
-  User.findByPk(id, function (err, user) {
-    done(err, user);
-  });
+  User.findByPk(id)
+    .then((user) => {
+      done(null, user);
+    })
+    .catch((err) => {
+      done(err, null);
+    });
 });
-
-// passport.use(
-//   new localStrategy(function (username, password, done) {
-//     User.findOne({ username }, function (err, user) {
-//       if (err) return done(err);
-//       if (!user)
-//         return done(null, false, { message: "Mot de pass incorrect." });
-
-//       bcrypt.compare(password, user.password, function (err, res) {
-//         if (err) return done(err);
-//         if (res === false)
-//           return done(null, false, { message: "Mot de pass incorrect." });
-
-//         return done(null, user);
-//       });
-//     });
-//   })
-// );
 
 passport.use(
   new localStrategy(function (username, password, done) {
@@ -126,7 +96,7 @@ passport.use(
         if (!user)
           return done(null, false, { message: "Mot de passe incorrect." });
 
-        bcrypt.compare(password, user.password, function (err, res) {
+        bcrypt.compare(password, user.dataValues.password, function (err, res) {
           if (err) return done(err);
           if (res === false)
             return done(null, false, { message: "Mot de passe incorrect." });
@@ -149,6 +119,10 @@ function isLoggedOut(req, res, next) {
   if (!req.isAuthenticated()) return next();
   res.redirect("/");
 }
+
+// function isAdmin(req, res, next){
+// 	if(req.user && req.user.Role.name === 'admin')
+// }
 
 // ROUTES
 app.get("/", isLoggedIn, (req, res) => {
@@ -184,67 +158,41 @@ app.get("/logout", function (req, res) {
 // Setup our admin user
 
 app.get("/setup", async (req, res) => {
-	const exists = await User.findOne({ where: { username: "admin" } });
-  
-	if (exists) {
-	  res.redirect("/login");
-	  return;
-	}
-  
-	bcrypt.genSalt(10, function (err, salt) {
-	  if (err) {
-		console.error(err);
-		res.redirect("/login");
-		return;
-	  }
-	  bcrypt.hash("pass", salt, function (err, hash) {
-		if (err) {
-		  console.error(err);
-		  res.redirect("/login");
-		  return;
-		}
-  
-		User.create({
-		  username: "admin",
-		  password: hash,
-		})
-		  .then(() => {
-			console.log("Admin user created successfully.");
-			res.redirect("/login");
-		  })
-		  .catch((err) => {
-			console.error("Failed to create admin user:", err);
-			res.redirect("/login");
-		  });
-	  });
-	});
+  const exists = await User.findOne({ where: { username: "admin" } });
+
+  if (exists) {
+    res.redirect("/login");
+    return;
+  }
+
+  bcrypt.genSalt(10, function (err, salt) {
+    if (err) {
+      console.error(err);
+      res.redirect("/login");
+      return;
+    }
+    bcrypt.hash("pass", salt, function (err, hash) {
+      if (err) {
+        console.error(err);
+        res.redirect("/login");
+        return;
+      }
+
+      User.create({
+        username: "admin",
+        password: hash,
+      })
+        .then(() => {
+          console.log("Admin user created successfully.");
+          res.redirect("/login");
+        })
+        .catch((err) => {
+          console.error("Failed to create admin user:", err);
+          res.redirect("/login");
+        });
+    });
   });
-
-
-// app.get("/setup", async (req, res) => {
-//   const exists = await User.exists({ username: "admin" });
-
-//   if (exists) {
-//     res.redirect("/login");
-//     return;
-//   }
-
-//   bcrypt.genSalt(10, function (err, salt) {
-//     if (err) return next(err);
-//     bcrypt.hash("pass", salt, function (err, hash) {
-//       if (err) return next(err);
-
-//       const newAdmin = new User({
-//         username: "admin",
-//         password: hash,
-//       });
-
-//       newAdmin.save();
-
-//       res.redirect("/login");
-//     });
-//   });
-// });
+});
 
 app.listen(3000, () => {
   console.log("Lancee au numero de port 3000");
