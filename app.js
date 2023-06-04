@@ -88,7 +88,7 @@ passport.serializeUser(function (user, done) {
 });
 
 passport.deserializeUser(function (id, done) {
-  User.findByPk(id)
+  User.findByPk(id, { include: Role })
     .then((user) => {
       done(null, user);
     })
@@ -129,7 +129,7 @@ function isLoggedOut(req, res, next) {
 }
 
 function isAdmin(req, res, next) {
-  if (req.user && req.user.Role.name === "admin") {
+  if (req.user && req.user.Role && req.user.Role.name === "admin") {
     next();
   } else {
     res.redirect("/");
@@ -138,12 +138,12 @@ function isAdmin(req, res, next) {
 
 // ROUTES
 
-app.get("/admin", isAdmin, (req, res) => {
-  //code pour la page d'administration
-});
+// app.get("/admin", isAdmin, (req, res) => {
+//   //code pour la page d'administration
+// });
 
-app.get("/", isLoggedIn, (req, res) => {
-  res.render("index", { title: "Home" });
+app.get("/", isLoggedIn, isAdmin, (req, res) => {
+  res.render("index", { title: "Home Admin" });
 });
 
 app.get("/about", (req, res) => {
